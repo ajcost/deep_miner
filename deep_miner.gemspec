@@ -9,9 +9,9 @@ Gem::Specification.new do |spec|
   spec.authors       = ["ajcost"]
   spec.email         = ["acost@sas.upenn.edu"]
 
-  spec.summary       = %q{Neural Network Library for machine learning}
-  #spec.description   = %q{TODO: Write a longer description or delete this line.}
-  #spec.homepage      = "TODO: Put your gem's website or public repo URL here."
+  spec.summary       = %q{Neural Network Library}
+  spec.description   = %q{A library allowing for implementation of neural networks in Ruby}
+  spec.homepage      = %q{https://github.com/ajcost/deep_miner}
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.
