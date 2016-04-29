@@ -1,9 +1,14 @@
 module DeepMiner
+  # ajcost
+  #
+  # Perceptron is class that implements a single layer neural net
+  # Implemenation is made with vertex_matrix class
   class Perceptron
     attr_reader :input, :hidden, :output
     attr_reader :weight_matrix_ih, :weight_matrix_ho
     attr_reader :output_delta_v, :hidden_delta_v
     attr_reader :change_matrix_i, :change_matrix_o
+    attr_reader :out_delta, :hidden_delta
 
     def initialize(input, hidden, output)
       fail ArgumentError, 'Input must be Array' unless input.is_a? Array
@@ -14,16 +19,58 @@ module DeepMiner
       # Create activation vectors and weight matrices and change matrices
       init_activations
       init_weight_matrices
-      init_change_matrices 
+      init_change_matrices
     end
 
     def predict(input_vector)
       fail ArgumentError, 'Input vector must be Array' unless input_vector.is_a? Array
-      fail ArgumentError, 'Input vector must be same size as input' unless input_vector.size == @input.size
+      fail ArgumentError, 'Predict input must be same size as input' unless input_vector.size == @input.size
       # Set activation vector for the input layer
       @act_input.apply_new_matrix([] << input_vector)
 
       # Calculate activation vector for the hidden layer
+      calculate_activation_hidden
+
+      # Calculate activation vector for the output layer
+      calculate_activation_output
+    end
+
+    def back_propogate(target, eta, momentum)
+      fail ArgumentError, 'Target must be Array' unless target.is_a? Array
+      fail ArgumentError, 'Target and Output must have same size' unless target.size == @output.size
+      # Calculate errors for output layer
+      errors_output(target)
+
+      # Calculate errors for hidden layer
+      errors_hidden
+
+      # Update weight vector from hidden to outputs
+      update_output_weight_vector(eta, momentum)
+
+      # Update weight vector from inputs to hidden
+      update_hidden_weight_vector(eta, momentum)
+
+      calculate_error(target)
+    end
+
+    # Train the network with training input, expectations, input, and epoch num
+    def train(train_data, expect, epoch_iter = 50, eta, m)
+      fail ArgumentError, 'Training must be Array' unless train_data.is_a? Array
+      fail ArgumentError, 'Expectation must be Array' unless expect.is_a? Array
+      fail ArgumentError, 'Data and Expectation must be same size' unless train_data.size == expect.size
+
+      1.upto(epoch_iter) do
+        error = 0.0
+        train_data.zip(expect) do |sample, target|
+          predict(sample)
+          error += back_propogate(target, eta, m)
+        end
+      end
+    end
+
+    private
+
+    def calculate_activation_hidden
       for j in 0..@hidden - 1
         sum = 0.0
         for i in 0..input.size - 1
@@ -31,8 +78,9 @@ module DeepMiner
         end
         @act_hidden.set_value(0, j, tanh_sigmoid(sum))
       end
+    end
 
-      # Calculate activation vector for the output layer
+    def calculate_activation_output
       for k in 0..@output.size - 1
         sum = 0.0
         for j in 0..@hidden - 1
@@ -43,40 +91,46 @@ module DeepMiner
       @act_output.to_array
     end
 
+    def calculate_error(target)
+      error = 0.0
+      0.upto(target.size - 1) do |k|
+        error += 0.5 * (target[k] - @act_output.get_value(0, k))**2
+      end
+      error
+    end
 
-    def back_propogate(target, eta, momentum)
-      fail ArgumentError, 'Target vector must be of type Array' unless target.is_a? Array
-      fail ArgumentError, 'Target and Output must same size' unless target.size == @output.size
-
-      # Calculate errors for output layer
-      out_delta = Array.new(@output.size, 0.0)
+    def errors_output(target)
+      @out_delta = Array.new(@output.size, 0.0)
       0.upto(@output.size - 1) do |k|
         act_val = @act_output.get_value(0, k)
         error = target[k] - act_val
-        out_delta[k] = dx_tanh_sigmoid(act_val) * error
+        @out_delta[k] = dx_tanh_sigmoid(act_val) * error
       end
+    end
 
-      # Calculate errors for hidden layer
-      hidden_delta = Array.new(@hidden, 0.0)
-      0.upto(@hidden - 1) do |j|
+    def errors_hidden
+      @hidden_delta = Array.new(@hidden, 0.0)
+      0.upto(@hidden - 1) do |i|
         error = 0.0
-        0.upto(@output.size - 1) do |k|
-          error += out_delta[k] * @weight_matrix_ho.get_value(j, k)
+        0.upto(@output.size - 1) do |j|
+          error += @out_delta[j] * @weight_matrix_ho.get_value(i, j)
         end
-        hidden_delta[j] = dx_tanh_sigmoid(@act_hidden.get_value(0,j)) * error
+        @hidden_delta[i] = dx_tanh_sigmoid(@act_hidden.get_value(0, i)) * error
       end
+    end
 
-      # Update weight vector from hidden to outputs
+    def update_output_weight_vector(eta, momentum)
       0.upto(@hidden - 1) do |j|
         0.upto(@output.size - 1) do |k|
-          delta = out_delta[k] * @act_hidden.get_value(0, j)
+          delta = @out_delta[k] * @act_hidden.get_value(0, j)
           value = delta * eta + momentum * @change_matrix_o.get_value(j, k)
           @weight_matrix_ho.add_value(j, k, value)
           @change_matrix_o.set_value(j, k, delta)
         end
       end
+    end
 
-      # Update weight vector from inputs to hidden
+    def update_hidden_weight_vector(eta, momentum)
       0.upto(@input.size - 1) do |i|
         0.upto(@hidden - 1) do |j|
           delta = hidden_delta[j] * @act_input.get_value(0, i)
@@ -85,32 +139,7 @@ module DeepMiner
           @change_matrix_i.set_value(i, j, delta)
         end
       end
-
-      # calculate error
-      error = 0.0
-      
-      target.each do |tg|
-        error += 0.5 * (tg - @act_output.get_value(0, k))**2
-      end
-      error
     end
-
-    # Train the perceptron with training vector input and expectation vector input epoch number
-    def train(train_data_vector, expectation_vector, epoch_iter = 50, eta, momentum)
-      fail ArgumentError, 'Training must be Array' unless train_data_vector.is_a? Array
-      fail ArgumentError, 'Expectation must be Array' unless expectation_vector.is_a? Array
-      fail ArgumentError, 'Data and Expectation must be same size' unless train_data_vector.size == expectation_vector.size
-
-      1.upto(epoch_iter) do
-        error = 0.0
-        train_data_vector.zip(expectation_vector) do |sample, target|
-          predict(sample)
-          error += back_propogate(target, eta, momentum)
-        end
-      end
-    end
-
-    private
 
     def init_activations
       ins = [1.0] * @input.size
@@ -127,8 +156,8 @@ module DeepMiner
     end
 
     def init_change_matrices
-      changei = Array.new(@input.size) { Array.new(@hidden, 0.0) }
-      changeo = Array.new(@hidden) { Array.new(@output.size, 0.0) }
+      changei = Array.new(@input.size) { Array.new(@hidden, rand(-0.2..0.2)) }
+      changeo = Array.new(@hidden) { Array.new(@output.size, rand(-0.2..0.2)) }
       @change_matrix_i = VectorMatrix.objectify(changei)
       @change_matrix_o = VectorMatrix.objectify(changeo)
     end
@@ -140,7 +169,7 @@ module DeepMiner
 
     # Computes the derivative of the sigmoid
     def dx_tanh_sigmoid(x)
-      1 - x**2 + (2 * x**4) / 4
+      1.0 - x**2
     end
   end
 end

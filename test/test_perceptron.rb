@@ -1,7 +1,9 @@
 require_relative "../lib/deep_miner/perceptron"
+require_relative "../lib/deep_miner/vector_matrix"
 require "test/unit"
 
 class TestPerceptron < Test::Unit::TestCase
+  
   def intialization_test_invalid_input
     assert_raise(ArgumentError.new('Input must be Array')) { DeepMiner::Perceptron.new(2, 3, [3, 4]) }
   end
