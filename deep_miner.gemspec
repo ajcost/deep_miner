@@ -12,6 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary       = %q{Neural Network Library}
   spec.description   = %q{A library allowing for implementation of neural networks in Ruby}
   spec.homepage      = %q{https://github.com/ajcost/deep_miner}
+  spec.license       = 'MIT'
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.
